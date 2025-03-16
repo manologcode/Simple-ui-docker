@@ -21,6 +21,10 @@ Permite iniciar y detener contenedores de manera intuitiva a través de una inte
 
 1. **Ejecuta directamente con docker:**
 
+crea primero el archivo de base de datos
+
+    touch data.json
+
 ejecución directa, ejecuta el comando de docker
 
 
