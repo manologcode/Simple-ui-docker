@@ -73,6 +73,28 @@ def toggle(docker_name):
     response = "error"
   return response
 
+@app.get("/stop/{docker_name}")
+def stop(docker_name):
+  container = get_container(docker_name)
+  if container:
+    if container.status == "running":
+      container.stop()
+      response = "exited"
+  else:
+    response = "error"
+  return response
+
+@app.get("/start/{docker_name}")
+def start(docker_name):
+  container = get_container(docker_name)
+  if container:
+    if container.status == "exited":
+      container.start()
+      response = "running"
+  else:
+    response = "error"
+  return response
+
 @app.get("/status/{docker_name}")
 def status(docker_name):
   container = get_container(docker_name)
