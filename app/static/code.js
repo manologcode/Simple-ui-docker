@@ -9,7 +9,8 @@ async function initializeApp() {
 async function drawButtons() {
   const services = await fetchServicesGet('/list');
   document.getElementById('title').textContent = services.title;
-  document.getElementById('button-container').innerHTML = services.data.map((service, index) => 
+  const sortedServices = services.data.sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById('button-container').innerHTML = sortedServices.map((service, index) => 
     createButtonHTML(index, service.port, service.name, service.status)).join('');
 }
 
@@ -28,10 +29,12 @@ async function drawButtonsEdit() {
   const data = await fetchServicesGet('/list_news');
   console.log(data)
   document.getElementById('title').textContent = data.title;
-  document.getElementById('button-container').innerHTML = [...data.items.map((item, i) => 
+  const sortedItems = data.items.sort((a, b) => a.name.localeCompare(b.name));
+  const sortedDockers = data.dockers.sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById('button-container').innerHTML = [...sortedItems.map((item, i) => 
     createButtonEditHTML(i, item.port, item.name, "item")), 
-    ...data.dockers.map((docker, i) => 
-    createButtonEditHTML(i + data.items.length, docker.port, docker.name, "docker"))].join('');
+    ...sortedDockers.map((docker, i) => 
+    createButtonEditHTML(i + sortedItems.length, docker.port, docker.name, "docker"))].join('');
 }
 
 function createButtonHTML(id, port, name, status) {
