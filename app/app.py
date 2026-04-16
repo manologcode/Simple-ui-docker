@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Any, Dict, List, Optional
@@ -27,6 +27,15 @@ async def html_ini():
             return HTMLResponse(content=file.read())
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found")
+
+@app.get("/apidocs.json")
+async def api_docs():
+    try:
+        with open("apidocs.json", "r", encoding="utf-8") as file:
+            api_docs_content = json.load(file)
+            return JSONResponse(content=api_docs_content)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="API docs not found")
 
 @app.post("/add_item")
 async def add_item(request: SemanticParams):

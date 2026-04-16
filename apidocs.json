@@ -1,0 +1,393 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Servidor de Datos API",
+    "description": "API para gestionar servicios Docker y base de datos TinyDB",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://192.168.1.69",
+      "description": "Servidor local de ia, gestiones los servicios docker para optimizar el rendimiento de la ia en un servidor de recursos limitados"
+    }
+  ],
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Obtener interfaz HTML principal",
+        "description": "Devuelve la página HTML de inicio de la aplicación",
+        "tags": ["UI"],
+        "responses": {
+          "200": {
+            "description": "Página HTML cargada correctamente",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Archivo no encontrado"
+          }
+        }
+      }
+    },
+    "/add_item": {
+      "post": {
+        "summary": "Añadir un nuevo servicio",
+        "description": "Agrega un nuevo servicio a la base de datos",
+        "tags": ["Servicios"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Nombre del servicio"
+                  },
+                  "port": {
+                    "type": "string",
+                    "description": "Puerto asignado al servicio"
+                  }
+                },
+                "required": ["name", "port"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Servicio añadido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "Datos del servicio añadido"
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Título de la aplicación"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/del_item/": {
+      "post": {
+        "summary": "Eliminar un servicio",
+        "description": "Elimina un servicio existente de la base de datos",
+        "tags": ["Servicios"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Nombre del servicio a eliminar"
+                  },
+                  "port": {
+                    "type": "string",
+                    "description": "Puerto del servicio (requerido por modelo pero no se utiliza)"
+                  }
+                },
+                "required": ["name", "port"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Servicio eliminado correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "description": "Resultado de la eliminación"
+                    },
+                    "title": {
+                      "type": "string",
+                      "description": "Título de la aplicación"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list_news": {
+      "get": {
+        "summary": "Listar servicios no registrados",
+        "description": "Devuelve lista de contenedores Docker no registrados y servicios registrados",
+        "tags": ["Servicios"],
+        "responses": {
+          "200": {
+            "description": "Listas recuperadas correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "dockers": {
+                      "type": "array",
+                      "description": "Contenedores Docker no registrados",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "port": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "items": {
+                      "type": "array",
+                      "description": "Servicios registrados",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/list": {
+      "get": {
+        "summary": "Listar todos los servicios",
+        "description": "Devuelve lista completa de servicios con su estado actual",
+        "tags": ["Servicios"],
+        "responses": {
+          "200": {
+            "description": "Lista de servicios recuperada correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "port": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["running", "exited", "error"]
+                          }
+                        }
+                      }
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/toggle/{docker_name}": {
+      "get": {
+        "summary": "Alternar estado de un contenedor",
+        "description": "Inicia un contenedor detenido o detiene uno en ejecución",
+        "tags": ["Contenedores"],
+        "parameters": [
+          {
+            "name": "docker_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del contenedor Docker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operación completada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": ["running", "exited", "error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/start/{docker_name}": {
+      "get": {
+        "summary": "Iniciar un contenedor",
+        "description": "Inicia un contenedor Docker detenido",
+        "tags": ["Contenedores"],
+        "parameters": [
+          {
+            "name": "docker_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del contenedor Docker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contenedor iniciado o ya estaba en ejecución",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": ["running", "error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stop/{docker_name}": {
+      "get": {
+        "summary": "Detener un contenedor",
+        "description": "Detiene un contenedor Docker en ejecución",
+        "tags": ["Contenedores"],
+        "parameters": [
+          {
+            "name": "docker_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del contenedor Docker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contenedor detenido o ya estaba parado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": ["exited", "error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status/{docker_name}": {
+      "get": {
+        "summary": "Obtener estado de un contenedor",
+        "description": "Devuelve el estado actual de un contenedor Docker",
+        "tags": ["Contenedores"],
+        "parameters": [
+          {
+            "name": "docker_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Nombre del contenedor Docker"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado del contenedor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "enum": ["running", "exited", "error"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SemanticParams": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nombre del servicio"
+          },
+          "port": {
+            "type": "string",
+            "description": "Puerto del servicio"
+          }
+        },
+        "required": ["name", "port"]
+      },
+      "ServiceResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "UI",
+      "description": "Endpoints de interfaz de usuario"
+    },
+    {
+      "name": "Servicios",
+      "description": "Operaciones sobre servicios"
+    },
+    {
+      "name": "Contenedores",
+      "description": "Control de contenedores Docker"
+    }
+  ]
+}
