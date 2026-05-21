@@ -8,6 +8,8 @@ import uvicorn
 import os
 import json
 import re
+import time
+from collections import defaultdict, deque
 
 import db_tinydb as db_tinydb
 
@@ -63,21 +65,61 @@ def list():
   response=[]
   for item in db_tinydb.get_all_services():
     item['status'] = status(item['name'])
+    item['group'] = get_container_group(item['name'])
     response.append(item)
   result ={'data': response, 'title': title}
   return result
+
+@app.get("/list_groups")
+def list_groups():
+  """Returns containers grouped by ui.group label, with dependency order"""
+  all_containers = client.containers.list(all=True)
+  groups_dict = defaultdict(list)
+  ungrouped = []
+  
+  # Separar contenedores por grupo
+  for container in all_containers:
+    container_data = get_container_info(container)
+    group = get_container_group_by_labels(container)
+    
+    if group:
+      groups_dict[group].append(container_data)
+    else:
+      ungrouped.append(container_data)
+  
+  # Ordenar cada grupo por dependencias
+  result = {}
+  for group_name, containers in groups_dict.items():
+    ordered = build_start_order(containers, all_containers)
+    result[group_name] = ordered
+  
+  # Añadir contenedores sin grupo
+  if ungrouped:
+    result['ungrouped'] = ungrouped
+  
+  return {'groups': result, 'title': title}
 
 @app.get("/toggle/{docker_name}")
 def toggle(docker_name):
   container = get_container(docker_name)
   if container:
-    if container.status == "running":
-      container.stop()
-      response = "exited"
+    group = get_container_group_by_labels(container)
+    if group:
+      # Si pertenece a un grupo, toggle el grupo completo
+      if container.status == "running":
+        stop_group_containers(group)
+        response = "exited"
+      else:
+        start_group_containers(group)
+        response = "running"
     else:
-      container.start()
-      response = "running"
-    # response =  container.status
+      # Si no pertenece a grupo, toggle individual
+      if container.status == "running":
+        container.stop()
+        response = "exited"
+      else:
+        container.start()
+        response = "running"
   else:
     response = "error"
   return response
@@ -86,9 +128,14 @@ def toggle(docker_name):
 def stop(docker_name):
   container = get_container(docker_name)
   if container:
-    if container.status == "running":
-      container.stop()
+    group = get_container_group_by_labels(container)
+    if group:
+      stop_group_containers(group)
       response = "exited"
+    else:
+      if container.status == "running":
+        container.stop()
+        response = "exited"
   else:
     response = "error"
   return response
@@ -97,9 +144,14 @@ def stop(docker_name):
 def start(docker_name):
   container = get_container(docker_name)
   if container:
-    if container.status == "exited":
-      container.start()
+    group = get_container_group_by_labels(container)
+    if group:
+      start_group_containers(group)
       response = "running"
+    else:
+      if container.status == "exited":
+        container.start()
+        response = "running"
   else:
     response = "error"
   return response
@@ -141,6 +193,149 @@ def find_host_ports(data_str):
           first_non_empty_host_port = port
           break
   return first_non_empty_host_port
+
+
+# ===== GROUP MANAGEMENT FUNCTIONS =====
+
+def get_container_group_by_labels(container):
+  """Obtiene el label ui.group de un contenedor, retorna None si no existe"""
+  try:
+    labels = container.labels
+    return labels.get('ui.group') if labels else None
+  except:
+    return None
+
+def get_container_group(container_name):
+  """Obtiene el grupo de un contenedor por nombre"""
+  container = get_container(container_name)
+  if container:
+    return get_container_group_by_labels(container)
+  return None
+
+def get_container_info(container):
+  """Retorna info del contenedor: nombre, puerto, estado, grupo"""
+  data_str = json.dumps(container.attrs, indent=4)
+  port = find_host_ports(data_str)
+  return {
+    'name': container.name,
+    'port': port,
+    'status': container.status,
+    'group': get_container_group_by_labels(container)
+  }
+
+def get_depends_on(container, all_containers_list):
+  """Extrae las dependencias de un contenedor desde el label com.docker.compose.depends_on"""
+  try:
+    labels = container.labels
+    if not labels:
+      return []
+    depends_on_str = labels.get('com.docker.compose.depends_on', '')
+    if not depends_on_str:
+      return []
+    # Format: "service1:service_started,service2:service_started"
+    deps = []
+    for dep in depends_on_str.split(','):
+      if ':' in dep:
+        service_name = dep.split(':')[0].strip()
+        deps.append(service_name)
+    return deps
+  except:
+    return []
+
+def build_start_order(containers, all_containers_list):
+  """Construye el orden topológico de inicio basado en depends_on"""
+  # Crear mapa de nombre -> contenedor para lookup rápido
+  container_map = {c.name: c for c in all_containers_list}
+  
+  # Construir grafo de dependencias
+  name_list = [c['name'] for c in containers]
+  graph = {name: [] for name in name_list}
+  in_degree = {name: 0 for name in name_list}
+  
+  for container in containers:
+    c_name = container['name']
+    # Obtener el contenedor completo desde all_containers_list
+    full_container = container_map.get(c_name)
+    if full_container:
+      deps = get_depends_on(full_container, all_containers_list)
+      # Solo considerar dependencias que están en el grupo
+      for dep in deps:
+        if dep in name_list:
+          graph[dep].append(c_name)
+          in_degree[c_name] += 1
+  
+  # Topological sort using Kahn's algorithm
+  queue = deque([name for name in name_list if in_degree[name] == 0])
+  sorted_order = []
+  
+  while queue:
+    node = queue.popleft()
+    sorted_order.append(node)
+    for neighbor in graph[node]:
+      in_degree[neighbor] -= 1
+      if in_degree[neighbor] == 0:
+        queue.append(neighbor)
+  
+  # Reordenar contenedores según orden topológico
+  result = []
+  for name in sorted_order:
+    for container in containers:
+      if container['name'] == name:
+        result.append(container)
+        break
+  
+  return result
+
+def start_group_containers(group_name):
+  """Arranca todos los contenedores de un grupo en orden de dependencias"""
+  all_containers = client.containers.list(all=True)
+  group_containers = []
+  
+  for container in all_containers:
+    if get_container_group_by_labels(container) == group_name:
+      group_containers.append(get_container_info(container))
+  
+  if not group_containers:
+    return
+  
+  # Ordenar por dependencias
+  ordered = build_start_order(group_containers, all_containers)
+  
+  # Arrancar en orden
+  for container_info in ordered:
+    container = get_container(container_info['name'])
+    if container and container.status != "running":
+      try:
+        container.start()
+        time.sleep(1)  # Esperar 1s entre arranques
+      except:
+        pass
+
+def stop_group_containers(group_name):
+  """Para todos los contenedores de un grupo en orden inverso de dependencias"""
+  all_containers = client.containers.list(all=True)
+  group_containers = []
+  
+  for container in all_containers:
+    if get_container_group_by_labels(container) == group_name:
+      group_containers.append(get_container_info(container))
+  
+  if not group_containers:
+    return
+  
+  # Ordenar por dependencias y revertir para parada
+  ordered = build_start_order(group_containers, all_containers)
+  ordered.reverse()
+  
+  # Parar en orden inverso
+  for container_info in ordered:
+    container = get_container(container_info['name'])
+    if container and container.status == "running":
+      try:
+        container.stop()
+        time.sleep(0.5)  # Esperar 0.5s entre paradas
+      except:
+        pass
 
 
 if __name__ == "__main__":

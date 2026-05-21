@@ -1,6 +1,6 @@
 const urlBase = `${window.location.protocol}//${window.location.hostname}`;
-async function initializeApp() {
 
+async function initializeApp() {
   drawButtons();
   document.getElementById('edit-button').addEventListener('click', toggleEditButton);
   document.addEventListener('click', handleMenuToggle);
@@ -41,11 +41,11 @@ function createButtonHTML(id, port, name, status) {
   const isRunning = status === "running";
   return `
     <div class="button-container ${isRunning ? 'btn-active' : 'btn-unactive'}">
-      ${isRunning ? `<a href="${urlBase}:${port}" class="service-button" target="_blank" id="item-${id}">${name}</a>` : 
-      `<div class="service-button" id="item-${id}">${name}</div>`}
+      ${isRunning ? `<a href="${urlBase}:${port}" class="service-button" target="_blank" id="item-${name}">${name}</a>` : 
+      `<div class="service-button" id="item-${name}">${name}</div>`}
       <span class="menu-toggle">⋮</span>
       <div class="menu">
-        <div class="menu-item" onclick="toggleItem(${id})">${isRunning ? 'Parar servicio' : 'Arrancar servicio'}</div>
+        <div class="menu-item" onclick="toggleItem('${name}')">${isRunning ? 'Parar servicio' : 'Arrancar servicio'}</div>
       </div>
     </div>`;
 }
@@ -87,8 +87,18 @@ async function delItem(id) {
 }0
 
 async function toggleItem(id) {
-  const element = document.getElementById(`item-${id}`);
-  await fetchServicesGet(`/toggle/${element.textContent}`);
+  let containerName;
+  
+  // Si id es un string (nombre de contenedor), usarlo directamente
+  if (typeof id === 'string') {
+    containerName = id;
+  } else {
+    // Si es un número, obtener del elemento
+    const element = document.getElementById(`item-${id}`);
+    containerName = element.textContent;
+  }
+  
+  await fetchServicesGet(`/toggle/${containerName}`);
   drawButtons();
 }
 
