@@ -53,9 +53,12 @@ async def del_item(request: SemanticParams):
 def list_news():
   items=db_tinydb.get_all_services()
   dockers=list_dockers()
+  current_container = get_current_container_name()
+  
   dockers_not_in_items = [
     docker for docker in dockers
     if not any(item['name'] == docker['name'] for item in items)
+    and docker['name'] != current_container  # Excluir el propio servicio
   ]
 
   return {"dockers" : dockers_not_in_items, 'items': items, 'title': title}
@@ -336,6 +339,59 @@ def stop_group_containers(group_name):
         time.sleep(0.5)  # Esperar 0.5s entre paradas
       except:
         pass
+
+def get_current_container_name():
+  """Obtiene el nombre del contenedor actual del servicio"""
+  try:
+    # El hostname en Docker es generalmente el ID del contenedor
+    # Buscamos un contenedor que tenga este hostname como parte de su ID
+    hostname = os.environ.get('HOSTNAME', '')
+    
+    if not hostname:
+      return None
+    
+    all_containers = client.containers.list(all=True)
+    for container in all_containers:
+      if container.id.startswith(hostname) or container.name.lower() == hostname.lower():
+        return container.name
+    
+    return None
+  except:
+    return None
+
+@app.get("/stop-all")
+def stop_all():
+  """Para todos los contenedores excepto el servicio actual"""
+  current_container_name = get_current_container_name()
+  
+  try:
+    all_containers = client.containers.list(all=True)
+    stopped_containers = []
+    
+    for container in all_containers:
+      # No parar el contenedor actual
+      if current_container_name and container.name == current_container_name:
+        continue
+      
+      # Parar solo los que están corriendo
+      if container.status == "running":
+        try:
+          container.stop()
+          stopped_containers.append(container.name)
+          time.sleep(0.5)
+        except Exception as e:
+          pass
+    
+    return {
+      'status': 'success',
+      'stopped_containers': stopped_containers,
+      'current_container': current_container_name
+    }
+  except Exception as e:
+    return {
+      'status': 'error',
+      'message': str(e)
+    }
 
 
 if __name__ == "__main__":
