@@ -48,5 +48,13 @@ para correrlo en modo desarrollo usa:
 
 ```bash
 docker-compose up --build
-```
 
+```
+añadir etiquetas de grupo a los dockers
+
+```bash
+services:
+  app:
+    image: my_app
+    labels:
+      ui.group: "mi_proyecto"
