@@ -28,6 +28,14 @@ header img{
     width: 50px;
 }
 
+.version {
+    float: right;
+    margin-right: 1.5em;
+    margin-top: 1em;
+    font-size: 0.9em;
+    color: #7f8c8d;
+}
+
 .refresh-button {
     background-color: #3498db;
     border: none;
@@ -48,9 +56,9 @@ header img{
 }
 
 .container {
-    display: flex;
-    flex-direction: column;
-    gap: 2em;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5em;
     width: 90%;
     max-width: 1400px;
     margin: 2em auto;
